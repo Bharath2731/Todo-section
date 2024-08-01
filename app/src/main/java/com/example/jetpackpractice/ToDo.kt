@@ -18,6 +18,7 @@ class ToDo: RealmObject{
     var isChecked:Boolean=false
     var task:String?=null
     var dueDateLong: Long? = null
+    var isRemainderShown:Boolean=false
     @Ignore
     var dueDate: LocalDateTime?
         get() = dueDateLong?.let { LocalDateTime.ofEpochSecond(it,0, ZoneOffset.UTC) }
@@ -31,6 +32,7 @@ class CompletedTodo: RealmObject{
     var isChecked:Boolean=true
     var task:String?=null
     var dueDateLong: Long? = null
+    var isRemainderShown:Boolean=false
     @Ignore
     var dueDate: LocalDateTime?
         get() = dueDateLong?.let { LocalDateTime.ofEpochSecond(it,0, ZoneOffset.UTC) }

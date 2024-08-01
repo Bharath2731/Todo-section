@@ -1,13 +1,22 @@
 package com.example.jetpackpractice
 
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import io.realm.kotlin.ext.query
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import org.mongodb.kbson.ObjectId
+import java.time.Duration
+import java.time.LocalDateTime
+import java.util.concurrent.TimeUnit
 
-class ToDoViewModel : ViewModel(){
+class ToDoViewModel(application : Application) : AndroidViewModel(application){
     private val realm = MyApp.realm
 
     val todoList = realm
@@ -21,15 +30,27 @@ class ToDoViewModel : ViewModel(){
             emptyList()
         )
 
+    private fun scheduleReminder(id: String,todo: ToDo) {
+        if (todo != null && todo.dueDate != null) {
+            println("taskDelay  ${todo.id.toHexString()} ${todo.task} ${todo.dueDate}")
+            val delay = Duration.between(LocalDateTime.now(), todo.dueDate).toMillis()
+            println("taskDelay: $delay ")
+            val workRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
+                .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                .setInputData(workDataOf("todoId" to id))
+                .build()
 
+            WorkManager.getInstance(getApplication()).enqueue(workRequest)
+        }
+    }
 
     fun addTodo(todo: ToDo){
-        println("task ${todo.task} data: ${todo.dueDate}")
+        println("taskDelay added  ${todo.id.toHexString()} ${todo.task} ${todo.dueDate}")
+        var insertedTodo: String? =null
         realm.writeBlocking {
-            copyToRealm(todo)
+            insertedTodo =copyToRealm(todo).id.toHexString()
         }
-        //remove all
-//        removeAll()
+        scheduleReminder(insertedTodo!!,todo)
     }
     fun removeTodo(todo: ToDo){
         realm.writeBlocking {
@@ -52,6 +73,7 @@ class ToDoViewModel : ViewModel(){
                     isChecked=true
                     task=todo.task
                     dueDate=todo.dueDate
+                    isRemainderShown=false
                 }
             )
         }

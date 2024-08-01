@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AddCircle
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
@@ -43,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -70,7 +72,7 @@ import java.util.Calendar
 @Composable
 fun AddToDoCard(modifier: Modifier = Modifier,onClickDone: () -> Unit) {
     val viewModel: ToDoViewModel = viewModel()
-
+    val completedViewModel:CompletedTodoViewModel =viewModel()
     var task by rememberSaveable {
         mutableStateOf("")
     }
@@ -90,8 +92,8 @@ fun AddToDoCard(modifier: Modifier = Modifier,onClickDone: () -> Unit) {
     ) {
         Column(
             modifier = modifier
-                .padding(12.dp)
                 .background(color = Color.White)
+                .padding(12.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -183,12 +185,24 @@ fun AddToDoCard(modifier: Modifier = Modifier,onClickDone: () -> Unit) {
 //                            copyCompletedTodos.add(todoItem)
 //                            MyToDo.completedTodos.value = copyCompletedTodos
 //                        }
-                        var todo = ToDo().apply {
-                            isChecked=status
-                            this.task=task
-                            dueDate=selectedDateTime
+
+                        if(!status){
+                            var todo = ToDo().apply {
+                                isChecked=status
+                                this.task=task
+                                dueDate=selectedDateTime
+                            }
+                            viewModel.addTodo(todo)
                         }
-                        viewModel.addTodo(todo)
+                        else{
+                            var completedTodo = CompletedTodo().apply {
+                                isChecked=status
+                                this.task=task
+                                dueDate=selectedDateTime
+                            }
+                            completedViewModel.addCompletedTodo(completedTodo)
+                        }
+
                         onClickDone()
 
                     }
@@ -209,14 +223,16 @@ fun AddToDoCard(modifier: Modifier = Modifier,onClickDone: () -> Unit) {
 }
 @Composable
 fun CompletedTodoCard(modifier: Modifier = Modifier,completedTodo: CompletedTodo){
-
+    val completedTodoViewModel = viewModel<CompletedTodoViewModel>()
         Surface(
             modifier = modifier
                 .padding(8.dp)
                 .fillMaxWidth(),
             shape = MaterialTheme.shapes.small
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Checkbox(
                     checked = completedTodo.isChecked, onCheckedChange = {},
                     modifier = modifier.scale(.8f),
@@ -224,7 +240,10 @@ fun CompletedTodoCard(modifier: Modifier = Modifier,completedTodo: CompletedTodo
                         checkedColor = Color.LightGray
                     )
                 )
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.Start
+                    ) {
                     completedTodo.task?.let {
                         Text(
                             text = it,
@@ -245,6 +264,13 @@ fun CompletedTodoCard(modifier: Modifier = Modifier,completedTodo: CompletedTodo
                         }
                     }
                 }
+                Icon(imageVector = Icons.Rounded.Delete,
+                    contentDescription ="",
+                    tint = Color.Gray,
+                    modifier = modifier.clickable {
+                        completedTodoViewModel.removeCompletedTodo(completedTodo)
+                        }
+                    )
             }
         }
 
@@ -253,6 +279,11 @@ fun CompletedTodoCard(modifier: Modifier = Modifier,completedTodo: CompletedTodo
 @Composable
 fun ToDoCard(modifier: Modifier = Modifier, todo: ToDo) {
     val viewModel: ToDoViewModel = viewModel()
+    if(todo.isRemainderShown){
+        Dialog(onDismissRequest = { /*TODO*/ }) {
+            ReminderPopup(modifier = modifier, todo = todo)
+        }
+    }
     if(!todo.isChecked){
         Surface(
             modifier = modifier
@@ -310,20 +341,6 @@ fun AddButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
     }
 }
 
-@Composable
-fun NavBar(modifier: Modifier = Modifier) {
-    Surface {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                imageVector = Icons.Rounded.Settings,
-                contentDescription = "",
-                modifier = modifier.padding(15.dp),
-                tint = Color.Gray
-            )
-        }
-    }
-}
 
 @Composable
 fun DatePicker(modifier: Modifier =Modifier.background(Color.Red)) {
@@ -383,7 +400,7 @@ fun DatePickerPopUp(modifier: Modifier=Modifier.background(Color.White),onClickC
                     .background(Color.White)
                     .fillMaxWidth()
             ){ snappedDateTime -> selectedDate=snappedDateTime }
-            Text(text = if(selectedDate!=null)"Selected Time : ${formatDate(selectedDate!!)}";
+            Text(text = if(selectedDate!=null)"Selected Time : ${formatDate(selectedDate!!)}"
                         else "",
                 modifier = modifier
                     .fillMaxWidth()
@@ -415,6 +432,36 @@ fun DatePickerPopUp(modifier: Modifier=Modifier.background(Color.White),onClickC
 
         }
     }
+}
+
+@Composable
+fun ReminderPopup(modifier: Modifier = Modifier,todo: ToDo) {
+    val viewModel: ToDoViewModel = viewModel()
+    Surface(modifier=modifier.fillMaxWidth(.9f),
+            shape = MaterialTheme.shapes.small
+        ) {
+        Column (modifier= modifier
+            .fillMaxWidth(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ){
+            Text(
+                text = "You got ${if (todo.task!=null) "\"${todo.task}\"" else ""} to complete",
+                modifier = modifier
+                    .padding(4.dp)
+                    .padding(top = 12.dp)
+            )
+            Button(onClick = {
+                viewModel.updateTodo(todo)
+            },
+                modifier=modifier.padding(top = 5.dp, bottom = 5.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CustomYellow)
+            ) {
+                Text(text = "Done")
+            }
+        }
+
+    }
 
 }
 @Preview(showBackground = true)
@@ -430,16 +477,16 @@ fun DatePickerPopUpPreview() {
     DatePickerPopUp(modifier = Modifier, onClickCancel = { }, onClickDone = { })
 }
 
-@Preview(showBackground = true)
-@Composable
-fun NavBarPreview() {
-    NavBar()
-}
 
 @Preview(showBackground = true)
 @Composable
 fun ToDoCardPreview() {
     ToDoCard(modifier = Modifier, todo = ToDo())
+}
+@Preview(showBackground = true)
+@Composable
+fun CompletedToDoCardPreview() {
+    CompletedTodoCard(modifier = Modifier, completedTodo = CompletedTodo())
 }
 
 @Preview(showBackground = true)
@@ -454,4 +501,12 @@ fun AddButtonPreview() {
 @Composable
 fun AddToDoCardPreview() {
     AddToDoCard(modifier = Modifier, onClickDone = {})
+}
+@Preview(showBackground = true)
+@Composable
+fun ReminderPopupPreview() {
+    var todo= ToDo()
+    todo.task="task"
+    todo.dueDate = LocalDateTime.now()
+    ReminderPopup(modifier = Modifier,todo )
 }
